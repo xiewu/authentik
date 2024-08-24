@@ -37,7 +37,7 @@ from authentik.stages.captcha.stage import (
 )
 from authentik.stages.identification.models import IdentificationStage
 from authentik.stages.identification.signals import identification_failed
-from authentik.stages.password.stage import authenticate
+from authentik.stages.password.stage import PasswordChallenge, PasswordStageView, authenticate
 
 
 @extend_schema_field(
@@ -68,9 +68,8 @@ class IdentificationChallenge(Challenge):
     """Identification challenges with all UI elements"""
 
     user_fields = ListField(child=CharField(), allow_empty=True, allow_null=True)
-    password_fields = BooleanField()
+    password_stage = PasswordChallenge(required=False)
     captcha_stage = CaptchaChallenge(required=False)
-    allow_show_password = BooleanField(default=False)
     application_pre = CharField(required=False)
     flow_designation = ChoiceField(FlowDesignation.choices)
 
@@ -204,9 +203,6 @@ class IdentificationStageView(ChallengeStageView[IdentificationStage]):
                 "component": "ak-stage-identification",
                 "primary_action": self.get_primary_action(),
                 "user_fields": self.current_stage.user_fields,
-                "password_fields": bool(self.current_stage.password_stage),
-                "allow_show_password": bool(self.current_stage.password_stage)
-                and self.current_stage.password_stage.allow_show_password,
                 "show_source_labels": self.current_stage.show_source_labels,
                 "flow_designation": self.executor.flow.designation,
             }
@@ -237,6 +233,11 @@ class IdentificationStageView(ChallengeStageView[IdentificationStage]):
                 query=get_qs,
                 kwargs={"flow_slug": self.current_stage.passwordless_flow.slug},
             )
+        if self.current_stage.password_stage:
+            password = PasswordStageView(self.executor, self.current_stage.captcha_stage)
+            password_challenge = password.get_challenge()
+            password_challenge.is_valid()
+            challenge.initial_data["password_stage"] = password_challenge.data
         if self.current_stage.captcha_stage:
             captcha = CaptchaStageView(self.executor, self.current_stage.captcha_stage)
             captcha_challenge = captcha.get_challenge()

@@ -3,8 +3,8 @@ import "@goauthentik/elements/Divider";
 import "@goauthentik/elements/EmptyState";
 import "@goauthentik/elements/forms/FormElement";
 import "@goauthentik/flow/components/ak-flow-password-input.js";
-import "@goauthentik/flow/stages/captcha/CaptchaStage";
 import { BaseStage } from "@goauthentik/flow/stages/base";
+import "@goauthentik/flow/stages/captcha/CaptchaStage";
 
 import { msg, str } from "@lit/localize";
 import { CSSResult, PropertyValues, TemplateResult, css, html, nothing } from "lit";
@@ -124,7 +124,7 @@ export class IdentificationStage extends BaseStage<
             this.form.appendChild(username);
         }
         // Only add the password field when we don't already show a password field
-        if (!compatMode && !this.challenge.passwordFields) {
+        if (!compatMode && !this.challenge.passwordStage) {
             const password = document.createElement("input");
             password.setAttribute("type", "password");
             password.setAttribute("name", "password");
@@ -261,7 +261,7 @@ export class IdentificationStage extends BaseStage<
                     required
                 />
             </ak-form-element>
-            ${this.challenge.passwordFields
+            ${this.challenge.passwordStage
                 ? html`
                       <ak-flow-input-password
                           label=${msg("Password")}
@@ -269,15 +269,20 @@ export class IdentificationStage extends BaseStage<
                           required
                           class="pf-c-form__group"
                           .errors=${(this.challenge?.responseErrors || {})["password"]}
-                          ?allow-show-password=${this.challenge.allowShowPassword}
+                          ?allow-show-password=${this.challenge.passwordStage.allowShowPassword}
                           prefill=${PasswordManagerPrefill["password"] ?? ""}
                       ></ak-flow-input-password>
                   `
                 : nothing}
             ${this.renderNonFieldErrors()}
-            ${this.challenge.captchaStage ? html`
-                <ak-stage-captcha .challenge=${this.challenge.captchaStage} embedded></ak-stage-captcha>
-                ` : nothing}
+            ${this.challenge.captchaStage
+                ? html`
+                      <ak-stage-captcha
+                          .challenge=${this.challenge.captchaStage}
+                          embedded
+                      ></ak-stage-captcha>
+                  `
+                : nothing}
             <div class="pf-c-form__group pf-m-action">
                 <button type="submit" class="pf-c-button pf-m-primary pf-m-block">
                     ${this.challenge.primaryAction}
@@ -288,8 +293,10 @@ export class IdentificationStage extends BaseStage<
                 : nothing}`;
     }
 
-    submitForm(e: Event, defaults?: IdentificationChallengeResponseRequest | undefined): Promise<boolean> {
-
+    submitForm(
+        e: Event,
+        defaults?: IdentificationChallengeResponseRequest | undefined,
+    ): Promise<boolean> {
         return super.submitForm(e, defaults);
     }
 

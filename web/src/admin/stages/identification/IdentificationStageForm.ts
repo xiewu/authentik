@@ -190,11 +190,7 @@ export class IdentificationStageForm extends BaseStageForm<IdentificationStage> 
                             ?blankable=${true}
                         >
                         </ak-search-select>
-                        <p class="pf-c-form__helper-text">
-                            ${msg(
-                                "TODO.",
-                            )}
-                        </p>
+                        <p class="pf-c-form__helper-text">${msg("TODO.")}</p>
                     </ak-form-element-horizontal>
                     <ak-form-element-horizontal name="caseInsensitiveMatching">
                         <label class="pf-c-switch">
