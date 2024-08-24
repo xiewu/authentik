@@ -17,7 +17,7 @@ from authentik.flows.challenge import RedirectChallenge
 from authentik.flows.exceptions import FlowNonApplicableException
 from authentik.flows.models import in_memory_stage
 from authentik.flows.planner import PLAN_CONTEXT_APPLICATION, FlowPlanner
-from authentik.flows.stage import RedirectStage
+from authentik.flows.stage import RedirectStageChallengeView
 from authentik.flows.views.executor import SESSION_KEY_PLAN
 from authentik.lib.utils.time import timedelta_from_string
 from authentik.lib.utils.urls import redirect_with_qs
@@ -83,7 +83,7 @@ class RACInterface(InterfaceView):
         return super().get_context_data(**kwargs)
 
 
-class RACFinalStage(RedirectStage):
+class RACFinalStage(RedirectStageChallengeView):
     """RAC Connection final stage, set the connection token in the stage"""
 
     endpoint: Endpoint

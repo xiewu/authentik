@@ -74,9 +74,9 @@ class FlowPlan:
 
     def redirect(self, destination: str):
         """Insert a redirect stage as next stage"""
-        from authentik.flows.stage import RedirectStage
+        from authentik.flows.stage import RedirectStageChallengeView
 
-        self.insert_stage(in_memory_stage(RedirectStage, destination=destination))
+        self.insert_stage(in_memory_stage(RedirectStageChallengeView, destination=destination))
 
     def next(self, http_request: HttpRequest | None) -> FlowStageBinding | None:
         """Return next pending stage from the bottom of the list"""

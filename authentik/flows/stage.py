@@ -255,7 +255,7 @@ class AccessDeniedChallengeView(ChallengeStageView):
         return self.executor.cancel()
 
 
-class RedirectStage(ChallengeStageView):
+class RedirectStageChallengeView(ChallengeStageView):
     """Redirect to any URL"""
 
     def get_challenge(self, *args, **kwargs) -> RedirectChallenge:
