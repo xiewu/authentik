@@ -48,7 +48,7 @@ class ConsentChallengeResponse(ChallengeResponse):
     token = CharField(required=True)
 
 
-class ConsentStageView(ChallengeStageView):
+class ConsentStageView(ChallengeStageView[ConsentStage]):
     """Simple consent checker."""
 
     response_class = ConsentChallengeResponse
@@ -72,14 +72,13 @@ class ConsentStageView(ChallengeStageView):
         """Check if the current request should require a prompt for non consent reasons,
         i.e. this stage injected from another stage, mode is always requireed or no application
         is set."""
-        current_stage: ConsentStage = self.executor.current_stage
         # Make this StageView work when injected, in which case `current_stage` is an instance
         # of the base class, and we don't save any consent, as it is assumed to be a one-time
         # prompt
-        if not isinstance(current_stage, ConsentStage):
+        if not isinstance(self.current_stage, ConsentStage):
             return True
         # For always require, we always return the challenge
-        if current_stage.mode == ConsentMode.ALWAYS_REQUIRE:
+        if self.current_stage.mode == ConsentMode.ALWAYS_REQUIRE:
             return True
         # at this point we need to check consent from database
         if PLAN_CONTEXT_APPLICATION not in self.executor.plan.context:
@@ -125,7 +124,6 @@ class ConsentStageView(ChallengeStageView):
             return self.get(self.request)
         if self.should_always_prompt():
             return self.executor.stage_ok()
-        current_stage: ConsentStage = self.executor.current_stage
         application = self.executor.plan.context[PLAN_CONTEXT_APPLICATION]
         permissions = self.executor.plan.context.get(
             PLAN_CONTEXT_CONSENT_PERMISSIONS, []
@@ -139,9 +137,9 @@ class ConsentStageView(ChallengeStageView):
             )
         consent: UserConsent = self.executor.plan.context[PLAN_CONTEXT_CONSENT]
         consent.permissions = permissions_string
-        if current_stage.mode == ConsentMode.PERMANENT:
+        if self.current_stage.mode == ConsentMode.PERMANENT:
             consent.expiring = False
-        if current_stage.mode == ConsentMode.EXPIRING:
-            consent.expires = now() + timedelta_from_string(current_stage.consent_expire_in)
+        if self.current_stage.mode == ConsentMode.EXPIRING:
+            consent.expires = now() + timedelta_from_string(self.current_stage.consent_expire_in)
         consent.save()
         return self.executor.stage_ok()

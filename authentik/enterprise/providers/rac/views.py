@@ -91,9 +91,9 @@ class RACFinalStage(RedirectStage):
     application: Application
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        self.endpoint = self.executor.current_stage.endpoint
-        self.provider = self.executor.current_stage.provider
-        self.application = self.executor.current_stage.application
+        self.endpoint = self.current_stage.endpoint
+        self.provider = self.current_stage.provider
+        self.application = self.current_stage.application
         # Check policies bound to endpoint directly
         engine = PolicyEngine(self.endpoint, self.request.user, self.request)
         engine.use_cache = False
@@ -132,7 +132,7 @@ class RACFinalStage(RedirectStage):
             flow=self.executor.plan.flow_pk,
             endpoint=self.endpoint.name,
         ).from_http(self.request)
-        self.executor.current_stage.destination = self.request.build_absolute_uri(
+        self.current_stage.destination = self.request.build_absolute_uri(
             reverse("authentik_providers_rac:if-rac", kwargs={"token": str(token.token)})
         )
         return super().get_challenge(*args, **kwargs)

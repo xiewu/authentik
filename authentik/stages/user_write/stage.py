@@ -55,7 +55,7 @@ class UserWriteStageView(StageView):
         """Ensure a user exists"""
         user_created = False
         path = self.executor.plan.context.get(
-            PLAN_CONTEXT_USER_PATH, self.executor.current_stage.user_path_template
+            PLAN_CONTEXT_USER_PATH, self.current_stage.user_path_template
         )
         if path == "":
             path = User.default_path()
@@ -64,11 +64,11 @@ class UserWriteStageView(StageView):
             user_type = UserTypes(
                 self.executor.plan.context.get(
                     PLAN_CONTEXT_USER_TYPE,
-                    self.executor.current_stage.user_type,
+                    self.current_stage.user_type,
                 )
             )
         except ValueError:
-            user_type = self.executor.current_stage.user_type
+            user_type = self.current_stage.user_type
         if user_type == UserTypes.INTERNAL_SERVICE_ACCOUNT:
             user_type = UserTypes.SERVICE_ACCOUNT
 
@@ -76,12 +76,12 @@ class UserWriteStageView(StageView):
             self.executor.plan.context.setdefault(PLAN_CONTEXT_PENDING_USER, self.request.user)
         if (
             PLAN_CONTEXT_PENDING_USER not in self.executor.plan.context
-            or self.executor.current_stage.user_creation_mode == UserCreationMode.ALWAYS_CREATE
+            or self.current_stage.user_creation_mode == UserCreationMode.ALWAYS_CREATE
         ):
-            if self.executor.current_stage.user_creation_mode == UserCreationMode.NEVER_CREATE:
+            if self.current_stage.user_creation_mode == UserCreationMode.NEVER_CREATE:
                 return None, False
             self.executor.plan.context[PLAN_CONTEXT_PENDING_USER] = User(
-                is_active=not self.executor.current_stage.create_users_as_inactive,
+                is_active=not self.current_stage.create_users_as_inactive,
                 path=path,
                 type=user_type,
             )
@@ -180,8 +180,8 @@ class UserWriteStageView(StageView):
         try:
             with transaction.atomic():
                 user.save()
-                if self.executor.current_stage.create_users_group:
-                    user.ak_groups.add(self.executor.current_stage.create_users_group)
+                if self.current_stage.create_users_group:
+                    user.ak_groups.add(self.current_stage.create_users_group)
                 if PLAN_CONTEXT_GROUPS in self.executor.plan.context:
                     user.ak_groups.add(*self.executor.plan.context[PLAN_CONTEXT_GROUPS])
         except (IntegrityError, ValueError, TypeError, InternalError) as exc:

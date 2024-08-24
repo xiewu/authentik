@@ -57,21 +57,20 @@ class AuthenticatorSMSChallengeResponse(ChallengeResponse):
         return super().validate(attrs)
 
 
-class AuthenticatorSMSStageView(ChallengeStageView):
+class AuthenticatorSMSStageView(ChallengeStageView[AuthenticatorSMSStage]):
     """OTP sms Setup stage"""
 
     response_class = AuthenticatorSMSChallengeResponse
 
     def validate_and_send(self, phone_number: str):
         """Validate phone number and send message"""
-        stage: AuthenticatorSMSStage = self.executor.current_stage
         hashed_number = hash_phone_number(phone_number)
         query = Q(phone_number=hashed_number) | Q(phone_number=phone_number)
-        if SMSDevice.objects.filter(query, stage=stage.pk).exists():
+        if SMSDevice.objects.filter(query, stage=self.current_stage.pk).exists():
             raise ValidationError(_("Invalid phone number"))
         # No code yet, but we have a phone number, so send a verification message
         device: SMSDevice = self.request.session[SESSION_KEY_SMS_DEVICE]
-        stage.send(device.token, device)
+        self.current_stage.send(device.token, device)
 
     def _has_phone_number(self) -> str | None:
         context = self.executor.plan.context
@@ -101,10 +100,10 @@ class AuthenticatorSMSStageView(ChallengeStageView):
     def get(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
         user = self.get_pending_user()
 
-        stage: AuthenticatorSMSStage = self.executor.current_stage
-
         if SESSION_KEY_SMS_DEVICE not in self.request.session:
-            device = SMSDevice(user=user, confirmed=False, stage=stage, name="SMS Device")
+            device = SMSDevice(
+                user=user, confirmed=False, stage=self.current_stage, name="SMS Device"
+            )
             device.generate_token(commit=False)
             self.request.session[SESSION_KEY_SMS_DEVICE] = device
             if phone_number := self._has_phone_number():
@@ -130,8 +129,7 @@ class AuthenticatorSMSStageView(ChallengeStageView):
         device: SMSDevice = self.request.session[SESSION_KEY_SMS_DEVICE]
         if not device.confirmed:
             return self.challenge_invalid(response)
-        stage: AuthenticatorSMSStage = self.executor.current_stage
-        if stage.verify_only:
+        if self.current_stage.verify_only:
             self.logger.debug("Hashing number on device")
             device.set_hashed_number()
         device.save()

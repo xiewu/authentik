@@ -30,11 +30,11 @@ class DummyStageView(ChallengeStageView):
         return self.executor.stage_ok()
 
     def get_challenge(self, *args, **kwargs) -> Challenge:
-        if self.executor.current_stage.throw_error:
+        if self.current_stage.throw_error:
             raise SentryIgnoredException("Test error")
         return DummyChallenge(
             data={
-                "title": self.executor.current_stage.name,
-                "name": self.executor.current_stage.name,
+                "title": self.current_stage.name,
+                "name": self.current_stage.name,
             }
         )

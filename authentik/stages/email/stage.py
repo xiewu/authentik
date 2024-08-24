@@ -46,7 +46,7 @@ class EmailChallengeResponse(ChallengeResponse):
         raise ValidationError(detail="email-sent", code="email-sent")
 
 
-class EmailStageView(ChallengeStageView):
+class EmailStageView(ChallengeStageView[EmailStage]):
     """Email stage which sends Email for verification"""
 
     response_class = EmailChallengeResponse
@@ -72,11 +72,10 @@ class EmailStageView(ChallengeStageView):
     def get_token(self) -> FlowToken:
         """Get token"""
         pending_user = self.get_pending_user()
-        current_stage: EmailStage = self.executor.current_stage
         valid_delta = timedelta(
-            minutes=current_stage.token_expiry + 1
+            minutes=self.current_stage.token_expiry + 1
         )  # + 1 because django timesince always rounds down
-        identifier = slugify(f"ak-email-stage-{current_stage.name}-{str(uuid4())}")
+        identifier = slugify(f"ak-email-stage-{self.current_stage.name}-{str(uuid4())}")
         # Don't check for validity here, we only care if the token exists
         tokens = FlowToken.objects.filter(identifier=identifier)
         if not tokens.exists():
@@ -105,15 +104,14 @@ class EmailStageView(ChallengeStageView):
         email = self.executor.plan.context.get(PLAN_CONTEXT_EMAIL_OVERRIDE, None)
         if not email:
             email = pending_user.email
-        current_stage: EmailStage = self.executor.current_stage
         token = self.get_token()
         # Send mail to user
         try:
             message = TemplateEmailMessage(
-                subject=_(current_stage.subject),
+                subject=_(self.current_stage.subject),
                 to=[(pending_user.name, email)],
                 language=pending_user.locale(self.request),
-                template_name=current_stage.template,
+                template_name=self.current_stage.template,
                 template_context={
                     "url": self.get_full_url(**{QS_KEY_TOKEN: token.key}),
                     "user": pending_user,
@@ -121,26 +119,28 @@ class EmailStageView(ChallengeStageView):
                     "token": token.key,
                 },
             )
-            send_mails(current_stage, message)
+            send_mails(self.current_stage, message)
         except TemplateSyntaxError as exc:
             Event.new(
                 EventAction.CONFIGURATION_ERROR,
                 message=_("Exception occurred while rendering E-mail template"),
                 error=exception_to_string(exc),
-                template=current_stage.template,
+                template=self.current_stage.template,
             ).from_http(self.request)
             raise StageInvalidException from exc
 
     def get(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
         # Check if the user came back from the email link to verify
-        restore_token: FlowToken = self.executor.plan.context.get(PLAN_CONTEXT_IS_RESTORED, None)
+        restore_token: FlowToken | None = self.executor.plan.context.get(
+            PLAN_CONTEXT_IS_RESTORED, None
+        )
         user = self.get_pending_user()
         if restore_token:
             if restore_token.user != user:
                 self.logger.warning("Flow token for non-matching user, denying request")
                 return self.executor.stage_invalid()
             messages.success(request, _("Successfully verified Email."))
-            if self.executor.current_stage.activate_user_on_success:
+            if self.current_stage.activate_user_on_success:
                 user.is_active = True
                 user.save()
             return self.executor.stage_ok()

@@ -21,16 +21,15 @@ from authentik.lib.utils.time import timedelta_from_string
 PLAN_CONTEXT_RESUME_TOKEN = "resume_token"  # nosec
 
 
-class SourceStageView(ChallengeStageView):
+class SourceStageView(ChallengeStageView[SourceStage]):
     """Suspend the current flow execution and send the user to a source,
     after which this flow execution is resumed."""
 
     login_button: UILoginButton
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        current_stage: SourceStage = self.executor.current_stage
         source: Source = (
-            Source.objects.filter(pk=current_stage.source_id).select_subclasses().first()
+            Source.objects.filter(pk=self.current_stage.source_id).select_subclasses().first()
         )
         if not source:
             self.logger.warning("Source does not exist")
@@ -56,11 +55,10 @@ class SourceStageView(ChallengeStageView):
         pending_user: User = self.get_pending_user()
         if pending_user.is_anonymous or not pending_user.pk:
             pending_user = get_anonymous_user()
-        current_stage: SourceStage = self.executor.current_stage
-        identifier = slugify(f"ak-source-stage-{current_stage.name}-{str(uuid4())}")
+        identifier = slugify(f"ak-source-stage-{self.current_stage.name}-{str(uuid4())}")
         # Don't check for validity here, we only care if the token exists
         tokens = FlowToken.objects.filter(identifier=identifier)
-        valid_delta = timedelta_from_string(current_stage.resume_timeout)
+        valid_delta = timedelta_from_string(self.current_stage.resume_timeout)
         if not tokens.exists():
             return FlowToken.objects.create(
                 expires=now() + valid_delta,

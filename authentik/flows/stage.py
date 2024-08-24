@@ -30,6 +30,7 @@ from authentik.lib.avatars import DEFAULT_AVATAR, get_avatar
 from authentik.lib.utils.reflection import class_to_path
 
 if TYPE_CHECKING:
+    from authentik.flows.models import Stage
     from authentik.flows.views.executor import FlowExecutorView
 
 PLAN_CONTEXT_PENDING_USER_IDENTIFIER = "pending_user_identifier"
@@ -40,20 +41,21 @@ HIST_FLOWS_STAGE_TIME = Histogram(
 )
 
 
-class StageView(View):
+class StageView[TStage: "Stage"](View):
     """Abstract Stage"""
 
     executor: "FlowExecutorView"
+    current_stage: TStage
 
     request: HttpRequest = None
 
     logger: BoundLogger
 
-    def __init__(self, executor: "FlowExecutorView", **kwargs):
+    def __init__(self, executor: "FlowExecutorView", current_stage: TStage | None = None, **kwargs):
         self.executor = executor
-        current_stage = getattr(self.executor, "current_stage", None)
+        self.current_stage = current_stage or executor.current_stage
         self.logger = get_logger().bind(
-            stage=getattr(current_stage, "name", None),
+            stage=getattr(self.current_stage, "name", None),
             stage_view=class_to_path(type(self)),
         )
         super().__init__(**kwargs)
@@ -80,7 +82,7 @@ class StageView(View):
         """Cleanup session"""
 
 
-class ChallengeStageView(StageView):
+class ChallengeStageView[TStage: "Stage"](StageView[TStage]):
     """Stage view which response with a challenge"""
 
     response_class = ChallengeResponse
@@ -258,7 +260,7 @@ class RedirectStage(ChallengeStageView):
 
     def get_challenge(self, *args, **kwargs) -> RedirectChallenge:
         destination = getattr(
-            self.executor.current_stage, "destination", reverse("authentik_core:root-redirect")
+            self.current_stage, "destination", reverse("authentik_core:root-redirect")
         )
         return RedirectChallenge(
             data={

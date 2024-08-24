@@ -7,9 +7,10 @@ from django.utils.translation import gettext as _
 
 from authentik.flows.planner import PLAN_CONTEXT_PENDING_USER
 from authentik.flows.stage import StageView
+from authentik.stages.user_delete.models import UserDeleteStage
 
 
-class UserDeleteStageView(StageView):
+class UserDeleteStageView(StageView[UserDeleteStage]):
     """Finalise unenrollment flow by deleting the user object."""
 
     def dispatch(self, request: HttpRequest) -> HttpResponse:

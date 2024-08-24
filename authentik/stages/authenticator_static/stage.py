@@ -29,7 +29,7 @@ class AuthenticatorStaticChallengeResponse(ChallengeResponse):
     component = CharField(default="ak-stage-authenticator-static")
 
 
-class AuthenticatorStaticStageView(ChallengeStageView):
+class AuthenticatorStaticStageView(ChallengeStageView[AuthenticatorStaticStage]):
     """Static OTP Setup stage"""
 
     response_class = AuthenticatorStaticChallengeResponse
@@ -48,14 +48,14 @@ class AuthenticatorStaticStageView(ChallengeStageView):
             self.logger.debug("No pending user, continuing")
             return self.executor.stage_ok()
 
-        stage: AuthenticatorStaticStage = self.executor.current_stage
-
         if SESSION_STATIC_DEVICE not in self.request.session:
             device = StaticDevice(user=user, confirmed=False, name="Static Token")
             tokens = []
-            for _ in range(0, stage.token_count):
+            for _ in range(0, self.current_stage.token_count):
                 tokens.append(
-                    StaticToken(device=device, token=generate_id(length=stage.token_length))
+                    StaticToken(
+                        device=device, token=generate_id(length=self.current_stage.token_length)
+                    )
                 )
             self.request.session[SESSION_STATIC_DEVICE] = device
             self.request.session[SESSION_STATIC_TOKENS] = tokens

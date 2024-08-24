@@ -222,7 +222,7 @@ class PromptStageView(ChallengeStageView):
         return serializers
 
     def get_challenge(self, *args, **kwargs) -> Challenge:
-        fields: list[Prompt] = list(self.executor.current_stage.fields.all().order_by("order"))
+        fields: list[Prompt] = list(self.current_stage.fields.all().order_by("order"))
         context_prompt = self.executor.plan.context.get(PLAN_CONTEXT_PROMPT, {})
         serializers = self.get_prompt_challenge_fields(fields, context_prompt)
         challenge = PromptChallenge(
@@ -239,7 +239,7 @@ class PromptStageView(ChallengeStageView):
             instance=None,
             data=data,
             request=self.request,
-            stage_instance=self.executor.current_stage,
+            stage_instance=self.current_stage,
             stage=self,
             plan=self.executor.plan,
             user=self.get_pending_user(),

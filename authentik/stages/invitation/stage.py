@@ -17,7 +17,7 @@ INVITATION_IN_EFFECT = "invitation_in_effect"
 INVITATION = "invitation"
 
 
-class InvitationStageView(StageView):
+class InvitationStageView(StageView[InvitationStage]):
     """Finalise Authentication flow by logging the user in"""
 
     def get_token(self) -> str | None:
@@ -52,11 +52,10 @@ class InvitationStageView(StageView):
 
     def dispatch(self, request: HttpRequest) -> HttpResponse:
         """Apply data to the current flow based on a URL"""
-        stage: InvitationStage = self.executor.current_stage
 
         invite = self.get_invite()
         if not invite:
-            if stage.continue_flow_without_invitation:
+            if self.current_stage.continue_flow_without_invitation:
                 return self.executor.stage_ok()
             return self.executor.stage_invalid(_("Invalid invite/invite not found"))
 

@@ -108,7 +108,7 @@ class AuthenticatorWebAuthnChallengeResponse(ChallengeResponse):
         return registration
 
 
-class AuthenticatorWebAuthnStageView(ChallengeStageView):
+class AuthenticatorWebAuthnStageView(ChallengeStageView[AuthenticatorWebAuthnStage]):
     """WebAuthn stage"""
 
     response_class = AuthenticatorWebAuthnChallengeResponse
@@ -116,12 +116,11 @@ class AuthenticatorWebAuthnStageView(ChallengeStageView):
     def get_challenge(self, *args, **kwargs) -> Challenge:
         # clear session variables prior to starting a new registration
         self.request.session.pop(SESSION_KEY_WEBAUTHN_CHALLENGE, None)
-        stage: AuthenticatorWebAuthnStage = self.executor.current_stage
         user = self.get_pending_user()
 
         # library accepts none so we store null in the database, but if there is a value
         # set, cast it to string to ensure it's not a django class
-        authenticator_attachment = stage.authenticator_attachment
+        authenticator_attachment = self.current_stage.authenticator_attachment
         if authenticator_attachment:
             authenticator_attachment = AuthenticatorAttachment(str(authenticator_attachment))
 
@@ -132,8 +131,12 @@ class AuthenticatorWebAuthnStageView(ChallengeStageView):
             user_name=user.username,
             user_display_name=user.name,
             authenticator_selection=AuthenticatorSelectionCriteria(
-                resident_key=ResidentKeyRequirement(str(stage.resident_key_requirement)),
-                user_verification=UserVerificationRequirement(str(stage.user_verification)),
+                resident_key=ResidentKeyRequirement(
+                    str(self.current_stage.resident_key_requirement)
+                ),
+                user_verification=UserVerificationRequirement(
+                    str(self.current_stage.user_verification)
+                ),
                 authenticator_attachment=authenticator_attachment,
             ),
             attestation=AttestationConveyancePreference.DIRECT,

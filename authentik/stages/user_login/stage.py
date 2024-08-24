@@ -39,7 +39,7 @@ class UserLoginChallengeResponse(ChallengeResponse):
     remember_me = BooleanField(required=True)
 
 
-class UserLoginStageView(ChallengeStageView):
+class UserLoginStageView(ChallengeStageView[UserLoginStage]):
     """Finalise Authentication flow by logging the user in"""
 
     response_class = UserLoginChallengeResponse
@@ -49,8 +49,7 @@ class UserLoginStageView(ChallengeStageView):
 
     def dispatch(self, request: HttpRequest) -> HttpResponse:
         """Check for remember_me, and do login"""
-        stage: UserLoginStage = self.executor.current_stage
-        if timedelta_from_string(stage.remember_me_offset).total_seconds() > 0:
+        if timedelta_from_string(self.current_stage.remember_me_offset).total_seconds() > 0:
             return super().dispatch(request)
         return self.do_login(request)
 
@@ -59,9 +58,9 @@ class UserLoginStageView(ChallengeStageView):
 
     def set_session_duration(self, remember: bool) -> timedelta:
         """Update the sessions' expiry"""
-        delta = timedelta_from_string(self.executor.current_stage.session_duration)
+        delta = timedelta_from_string(self.current_stage.session_duration)
         if remember:
-            offset = timedelta_from_string(self.executor.current_stage.remember_me_offset)
+            offset = timedelta_from_string(self.current_stage.remember_me_offset)
             delta = delta + offset
         if delta.total_seconds() == 0:
             self.request.session.set_expiry(0)
@@ -71,11 +70,9 @@ class UserLoginStageView(ChallengeStageView):
 
     def set_session_ip(self):
         """Set the sessions' last IP and session bindings"""
-        stage: UserLoginStage = self.executor.current_stage
-
         self.request.session[SESSION_KEY_LAST_IP] = ClientIPMiddleware.get_client_ip(self.request)
-        self.request.session[SESSION_KEY_BINDING_NET] = stage.network_binding
-        self.request.session[SESSION_KEY_BINDING_GEO] = stage.geoip_binding
+        self.request.session[SESSION_KEY_BINDING_NET] = self.current_stage.network_binding
+        self.request.session[SESSION_KEY_BINDING_GEO] = self.current_stage.geoip_binding
 
     def do_login(self, request: HttpRequest, remember: bool = False) -> HttpResponse:
         """Attach the currently pending user to the current session"""
@@ -111,7 +108,7 @@ class UserLoginStageView(ChallengeStageView):
         # as sources show their own success messages
         if not self.executor.plan.context.get(PLAN_CONTEXT_SOURCE, None):
             messages.success(self.request, _("Successfully logged in!"))
-        if self.executor.current_stage.terminate_other_sessions:
+        if self.current_stage.terminate_other_sessions:
             AuthenticatedSession.objects.filter(
                 user=user,
             ).exclude(session_key=self.request.session.session_key).delete()

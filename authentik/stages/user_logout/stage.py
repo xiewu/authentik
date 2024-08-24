@@ -4,9 +4,10 @@ from django.contrib.auth import logout
 from django.http import HttpRequest, HttpResponse
 
 from authentik.flows.stage import StageView
+from authentik.stages.user_logout.models import UserLogoutStage
 
 
-class UserLogoutStageView(StageView):
+class UserLogoutStageView(StageView[UserLogoutStage]):
     """Finalise Authentication flow by logging the user in"""
 
     def dispatch(self, request: HttpRequest) -> HttpResponse:

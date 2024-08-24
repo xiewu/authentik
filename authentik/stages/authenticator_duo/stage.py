@@ -32,7 +32,7 @@ class AuthenticatorDuoChallengeResponse(ChallengeResponse):
     component = CharField(default="ak-stage-authenticator-duo")
 
 
-class AuthenticatorDuoStageView(ChallengeStageView):
+class AuthenticatorDuoStageView(ChallengeStageView[AuthenticatorDuoStage]):
     """Duo stage"""
 
     response_class = AuthenticatorDuoChallengeResponse
@@ -40,9 +40,8 @@ class AuthenticatorDuoStageView(ChallengeStageView):
     def duo_enroll(self):
         """Enroll User with Duo API and save results"""
         user = self.get_pending_user()
-        stage: AuthenticatorDuoStage = self.executor.current_stage
         try:
-            enroll = stage.auth_client().enroll(user.username)
+            enroll = self.current_stage.auth_client().enroll(user.username)
         except RuntimeError as exc:
             Event.new(
                 EventAction.CONFIGURATION_ERROR,
@@ -54,7 +53,6 @@ class AuthenticatorDuoStageView(ChallengeStageView):
         return enroll
 
     def get_challenge(self, *args, **kwargs) -> Challenge:
-        stage: AuthenticatorDuoStage = self.executor.current_stage
         if SESSION_KEY_DUO_ENROLL not in self.request.session:
             self.duo_enroll()
         enroll = self.request.session[SESSION_KEY_DUO_ENROLL]
@@ -62,15 +60,14 @@ class AuthenticatorDuoStageView(ChallengeStageView):
             data={
                 "activation_barcode": enroll["activation_barcode"],
                 "activation_code": enroll["activation_code"],
-                "stage_uuid": str(stage.stage_uuid),
+                "stage_uuid": str(self.current_stage.stage_uuid),
             }
         )
 
     def challenge_valid(self, response: ChallengeResponse) -> HttpResponse:
         # Duo Challenge has already been validated
-        stage: AuthenticatorDuoStage = self.executor.current_stage
         enroll = self.request.session.get(SESSION_KEY_DUO_ENROLL)
-        enroll_status = stage.auth_client().enroll_status(
+        enroll_status = self.current_stage.auth_client().enroll_status(
             enroll["user_id"], enroll["activation_code"]
         )
         if enroll_status != "success":
@@ -82,7 +79,7 @@ class AuthenticatorDuoStageView(ChallengeStageView):
                 name="Duo Authenticator",
                 user=self.get_pending_user(),
                 duo_user_id=enroll["user_id"],
-                stage=stage,
+                stage=self.current_stage,
                 last_t=now(),
             )
         else:

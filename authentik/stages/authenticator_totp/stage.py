@@ -45,7 +45,7 @@ class AuthenticatorTOTPChallengeResponse(ChallengeResponse):
         return code
 
 
-class AuthenticatorTOTPStageView(ChallengeStageView):
+class AuthenticatorTOTPStageView(ChallengeStageView[AuthenticatorTOTPStage]):
     """OTP totp Setup stage"""
 
     response_class = AuthenticatorTOTPChallengeResponse
@@ -71,11 +71,12 @@ class AuthenticatorTOTPStageView(ChallengeStageView):
             self.logger.debug("No pending user, continuing")
             return self.executor.stage_ok()
 
-        stage: AuthenticatorTOTPStage = self.executor.current_stage
-
         if SESSION_TOTP_DEVICE not in self.request.session:
             device = TOTPDevice(
-                user=user, confirmed=False, digits=stage.digits, name="TOTP Authenticator"
+                user=user,
+                confirmed=False,
+                digits=self.current_stage.digits,
+                name="TOTP Authenticator",
             )
 
             self.request.session[SESSION_TOTP_DEVICE] = device

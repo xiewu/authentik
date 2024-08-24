@@ -164,22 +164,21 @@ class IdentificationChallengeResponse(ChallengeResponse):
         return attrs
 
 
-class IdentificationStageView(ChallengeStageView):
+class IdentificationStageView(ChallengeStageView[IdentificationStage]):
     """Form to identify the user"""
 
     response_class = IdentificationChallengeResponse
 
     def get_user(self, uid_value: str) -> User | None:
         """Find user instance. Returns None if no user was found."""
-        current_stage: IdentificationStage = self.executor.current_stage
         query = Q()
-        for search_field in current_stage.user_fields:
+        for search_field in self.current_stage.user_fields:
             model_field = {
                 "email": "email",
                 "username": "username",
                 "upn": "attributes__upn",
             }[search_field]
-            if current_stage.case_insensitive_matching:
+            if self.current_stage.case_insensitive_matching:
                 model_field += "__iexact"
             else:
                 model_field += "__exact"
@@ -200,16 +199,15 @@ class IdentificationStageView(ChallengeStageView):
         return _("Continue")
 
     def get_challenge(self) -> Challenge:
-        current_stage: IdentificationStage = self.executor.current_stage
         challenge = IdentificationChallenge(
             data={
                 "component": "ak-stage-identification",
                 "primary_action": self.get_primary_action(),
-                "user_fields": current_stage.user_fields,
-                "password_fields": bool(current_stage.password_stage),
-                "allow_show_password": bool(current_stage.password_stage)
-                and current_stage.password_stage.allow_show_password,
-                "show_source_labels": current_stage.show_source_labels,
+                "user_fields": self.current_stage.user_fields,
+                "password_fields": bool(self.current_stage.password_stage),
+                "allow_show_password": bool(self.current_stage.password_stage)
+                and self.current_stage.password_stage.allow_show_password,
+                "show_source_labels": self.current_stage.show_source_labels,
                 "flow_designation": self.executor.flow.designation,
             }
         )
@@ -221,27 +219,26 @@ class IdentificationStageView(ChallengeStageView):
             ).name
         get_qs = self.request.session.get(SESSION_KEY_GET, self.request.GET)
         # Check for related enrollment and recovery flow, add URL to view
-        if current_stage.enrollment_flow:
+        if self.current_stage.enrollment_flow:
             challenge.initial_data["enroll_url"] = reverse_with_qs(
                 "authentik_core:if-flow",
                 query=get_qs,
-                kwargs={"flow_slug": current_stage.enrollment_flow.slug},
+                kwargs={"flow_slug": self.current_stage.enrollment_flow.slug},
             )
-        if current_stage.recovery_flow:
+        if self.current_stage.recovery_flow:
             challenge.initial_data["recovery_url"] = reverse_with_qs(
                 "authentik_core:if-flow",
                 query=get_qs,
-                kwargs={"flow_slug": current_stage.recovery_flow.slug},
+                kwargs={"flow_slug": self.current_stage.recovery_flow.slug},
             )
-        if current_stage.passwordless_flow:
+        if self.current_stage.passwordless_flow:
             challenge.initial_data["passwordless_url"] = reverse_with_qs(
                 "authentik_core:if-flow",
                 query=get_qs,
-                kwargs={"flow_slug": current_stage.passwordless_flow.slug},
+                kwargs={"flow_slug": self.current_stage.passwordless_flow.slug},
             )
-        if current_stage.captcha_stage:
-            captcha = CaptchaStageView(self.executor)
-            captcha.stage = current_stage.captcha_stage
+        if self.current_stage.captcha_stage:
+            captcha = CaptchaStageView(self.executor, self.current_stage.captcha_stage)
             captcha_challenge = captcha.get_challenge()
             captcha_challenge.is_valid()
             challenge.initial_data["captcha_stage"] = captcha_challenge.data
@@ -249,7 +246,7 @@ class IdentificationStageView(ChallengeStageView):
         # Check all enabled source, add them if they have a UI Login button.
         ui_sources = []
         sources: list[Source] = (
-            current_stage.sources.filter(enabled=True).order_by("name").select_subclasses()
+            self.current_stage.sources.filter(enabled=True).order_by("name").select_subclasses()
         )
         for source in sources:
             ui_login_button = source.ui_login_button(self.request)
@@ -264,8 +261,7 @@ class IdentificationStageView(ChallengeStageView):
 
     def challenge_valid(self, response: IdentificationChallengeResponse) -> HttpResponse:
         self.executor.plan.context[PLAN_CONTEXT_PENDING_USER] = response.pre_user
-        current_stage: IdentificationStage = self.executor.current_stage
-        if not current_stage.show_matched_user:
+        if not self.current_stage.show_matched_user:
             self.executor.plan.context[PLAN_CONTEXT_PENDING_USER_IDENTIFIER] = (
                 response.validated_data.get("uid_field")
             )

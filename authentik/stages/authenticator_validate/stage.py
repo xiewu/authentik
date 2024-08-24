@@ -151,7 +151,7 @@ class AuthenticatorValidationChallengeResponse(ChallengeResponse):
         return attrs
 
 
-class AuthenticatorValidateStageView(ChallengeStageView):
+class AuthenticatorValidateStageView(ChallengeStageView[AuthenticatorValidateStage]):
     """Authenticator Validation"""
 
     response_class = AuthenticatorValidationChallengeResponse
@@ -177,16 +177,14 @@ class AuthenticatorValidateStageView(ChallengeStageView):
         # since their challenges are device-independent
         seen_classes = []
 
-        stage: AuthenticatorValidateStage = self.executor.current_stage
-
-        threshold = timedelta_from_string(stage.last_auth_threshold)
+        threshold = timedelta_from_string(self.current_stage.last_auth_threshold)
         allowed_devices = []
 
-        has_webauthn_filters_set = stage.webauthn_allowed_device_types.exists()
+        has_webauthn_filters_set = self.current_stage.webauthn_allowed_device_types.exists()
 
         for device in user_devices:
             device_class = device.__class__.__name__.lower().replace("device", "")
-            if device_class not in stage.device_classes:
+            if device_class not in self.current_stage.device_classes:
                 self.logger.debug("device class not allowed", device_class=device_class)
                 continue
             if isinstance(device, SMSDevice) and device.is_hashed:
@@ -199,7 +197,7 @@ class AuthenticatorValidateStageView(ChallengeStageView):
                 and device.device_type
                 and has_webauthn_filters_set
             ):
-                if not stage.webauthn_allowed_device_types.filter(
+                if not self.current_stage.webauthn_allowed_device_types.filter(
                     pk=device.device_type.pk
                 ).exists():
                     self.logger.debug(
@@ -216,7 +214,7 @@ class AuthenticatorValidateStageView(ChallengeStageView):
                 data={
                     "device_class": device_class,
                     "device_uid": device.pk,
-                    "challenge": get_challenge_for_device(self.request, stage, device),
+                    "challenge": get_challenge_for_device(self.request, self.current_stage, device),
                 }
             )
             challenge.is_valid()
@@ -235,7 +233,7 @@ class AuthenticatorValidateStageView(ChallengeStageView):
                 "device_uid": -1,
                 "challenge": get_webauthn_challenge_without_user(
                     self.request,
-                    self.executor.current_stage,
+                    self.current_stage,
                 ),
             }
         )
@@ -246,7 +244,6 @@ class AuthenticatorValidateStageView(ChallengeStageView):
         """Check if a user is set, and check if the user has any devices
         if not, we can skip this entire stage"""
         user = self.get_pending_user()
-        stage: AuthenticatorValidateStage = self.executor.current_stage
         if user and not user.is_anonymous:
             try:
                 challenges = self.get_device_challenges()
@@ -257,7 +254,7 @@ class AuthenticatorValidateStageView(ChallengeStageView):
                 self.logger.debug("Refusing passwordless flow in non-authentication flow")
                 return self.executor.stage_ok()
             # Passwordless auth, with just webauthn
-            if DeviceClasses.WEBAUTHN in stage.device_classes:
+            if DeviceClasses.WEBAUTHN in self.current_stage.device_classes:
                 self.logger.debug("Flow without user, getting generic webauthn challenge")
                 challenges = self.get_webauthn_challenge_without_user()
             else:
@@ -267,13 +264,13 @@ class AuthenticatorValidateStageView(ChallengeStageView):
 
         # No allowed devices
         if len(challenges) < 1:
-            if stage.not_configured_action == NotConfiguredAction.SKIP:
+            if self.current_stage.not_configured_action == NotConfiguredAction.SKIP:
                 self.logger.debug("Authenticator not configured, skipping stage")
                 return self.executor.stage_ok()
-            if stage.not_configured_action == NotConfiguredAction.DENY:
+            if self.current_stage.not_configured_action == NotConfiguredAction.DENY:
                 self.logger.debug("Authenticator not configured, denying")
                 return self.executor.stage_invalid(_("No (allowed) MFA authenticator configured."))
-            if stage.not_configured_action == NotConfiguredAction.CONFIGURE:
+            if self.current_stage.not_configured_action == NotConfiguredAction.CONFIGURE:
                 self.logger.debug("Authenticator not configured, forcing configure")
                 return self.prepare_stages(user)
         return super().get(request, *args, **kwargs)
@@ -282,8 +279,7 @@ class AuthenticatorValidateStageView(ChallengeStageView):
         """Check how the user can configure themselves. If no stages are set, return an error.
         If a single stage is set, insert that stage directly. If multiple are selected, include
         them in the challenge."""
-        stage: AuthenticatorValidateStage = self.executor.current_stage
-        if not stage.configuration_stages.exists():
+        if not self.current_stage.configuration_stages.exists():
             Event.new(
                 EventAction.CONFIGURATION_ERROR,
                 message=(
@@ -293,15 +289,19 @@ class AuthenticatorValidateStageView(ChallengeStageView):
                 stage=self,
             ).from_http(self.request).set_user(user).save()
             return self.executor.stage_invalid()
-        if stage.configuration_stages.count() == 1:
-            next_stage = Stage.objects.get_subclass(pk=stage.configuration_stages.first().pk)
+        if self.current_stage.configuration_stages.count() == 1:
+            next_stage = Stage.objects.get_subclass(
+                pk=self.current_stage.configuration_stages.first().pk
+            )
             self.logger.debug("Single stage configured, auto-selecting", stage=next_stage)
             self.executor.plan.context[PLAN_CONTEXT_SELECTED_STAGE] = next_stage
             # Because that normal execution only happens on post, we directly inject it here and
             # return it
             self.executor.plan.insert_stage(next_stage)
             return self.executor.stage_ok()
-        stages = Stage.objects.filter(pk__in=stage.configuration_stages.all()).select_subclasses()
+        stages = Stage.objects.filter(
+            pk__in=self.current_stage.configuration_stages.all()
+        ).select_subclasses()
         self.executor.plan.context[PLAN_CONTEXT_STAGES] = stages
         return super().get(self.request, *args, **kwargs)
 
@@ -309,7 +309,7 @@ class AuthenticatorValidateStageView(ChallengeStageView):
         res = super().post(request, *args, **kwargs)
         if (
             PLAN_CONTEXT_SELECTED_STAGE in self.executor.plan.context
-            and self.executor.current_stage.not_configured_action == NotConfiguredAction.CONFIGURE
+            and self.current_stage.not_configured_action == NotConfiguredAction.CONFIGURE
         ):
             self.logger.debug("Got selected stage in context, running that")
             stage_pk = self.executor.plan.context.get(PLAN_CONTEXT_SELECTED_STAGE)
@@ -351,7 +351,7 @@ class AuthenticatorValidateStageView(ChallengeStageView):
     def cookie_jwt_key(self) -> str:
         """Signing key for MFA Cookie for this stage"""
         return sha256(
-            f"{get_unique_identifier()}:{self.executor.current_stage.pk.hex}".encode("ascii")
+            f"{get_unique_identifier()}:{self.current_stage.pk.hex}".encode("ascii")
         ).hexdigest()
 
     def check_mfa_cookie(self, allowed_devices: list[Device]):
@@ -362,12 +362,11 @@ class AuthenticatorValidateStageView(ChallengeStageView):
         correct user and with an allowed class"""
         if COOKIE_NAME_MFA not in self.request.COOKIES:
             return
-        stage: AuthenticatorValidateStage = self.executor.current_stage
-        threshold = timedelta_from_string(stage.last_auth_threshold)
+        threshold = timedelta_from_string(self.current_stage.last_auth_threshold)
         latest_allowed = datetime.now() + threshold
         try:
             payload = decode(self.request.COOKIES[COOKIE_NAME_MFA], self.cookie_jwt_key, ["HS256"])
-            if payload["stage"] != stage.pk.hex:
+            if payload["stage"] != self.current_stage.pk.hex:
                 self.logger.warning("Invalid stage PK")
                 return
             if datetime.fromtimestamp(payload["exp"]) > latest_allowed:
@@ -385,15 +384,14 @@ class AuthenticatorValidateStageView(ChallengeStageView):
         """Set an MFA cookie to allow users to skip MFA validation in this context (browser)
 
         The cookie is JWT which is signed with a hash of the secret key and the UID of the stage"""
-        stage: AuthenticatorValidateStage = self.executor.current_stage
-        delta = timedelta_from_string(stage.last_auth_threshold)
+        delta = timedelta_from_string(self.current_stage.last_auth_threshold)
         if delta.total_seconds() < 1:
             self.logger.info("Not setting MFA cookie since threshold is not set.")
             return self.executor.stage_ok()
         expiry = datetime.now() + delta
         cookie_payload = {
             "device": device.pk,
-            "stage": stage.pk.hex,
+            "stage": self.current_stage.pk.hex,
             "exp": expiry.timestamp(),
         }
         response = self.executor.stage_ok()

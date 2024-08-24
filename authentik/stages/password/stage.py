@@ -130,7 +130,7 @@ class PasswordChallengeResponse(ChallengeResponse):
         return password
 
 
-class PasswordStageView(ChallengeStageView):
+class PasswordStageView(ChallengeStageView[PasswordStage]):
     """Authentication stage which authenticates against django's AuthBackend"""
 
     response_class = PasswordChallengeResponse
@@ -138,7 +138,7 @@ class PasswordStageView(ChallengeStageView):
     def get_challenge(self) -> Challenge:
         challenge = PasswordChallenge(
             data={
-                "allow_show_password": self.executor.current_stage.allow_show_password,
+                "allow_show_password": self.current_stage.allow_show_password,
             }
         )
         recovery_flow = Flow.objects.filter(designation=FlowDesignation.RECOVERY)
@@ -154,10 +154,9 @@ class PasswordStageView(ChallengeStageView):
         if SESSION_KEY_INVALID_TRIES not in self.request.session:
             self.request.session[SESSION_KEY_INVALID_TRIES] = 0
         self.request.session[SESSION_KEY_INVALID_TRIES] += 1
-        current_stage: PasswordStage = self.executor.current_stage
         if (
             self.request.session[SESSION_KEY_INVALID_TRIES]
-            >= current_stage.failed_attempts_before_cancel
+            >= self.current_stage.failed_attempts_before_cancel
         ):
             self.logger.debug("User has exceeded maximum tries")
             del self.request.session[SESSION_KEY_INVALID_TRIES]

@@ -69,8 +69,8 @@ class MessageStage(StageView):
 
     def dispatch(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
         """Show a pre-configured message after the flow is done"""
-        message = getattr(self.executor.current_stage, "message", "")
-        level = getattr(self.executor.current_stage, "level", messages.SUCCESS)
+        message = getattr(self.current_stage, "message", "")
+        level = getattr(self.current_stage, "level", messages.SUCCESS)
         messages.add_message(
             self.request,
             level,
@@ -486,9 +486,7 @@ class GroupUpdateStage(StageView):
     def handle_groups(self) -> bool:
         self.source: Source = self.executor.plan.context[PLAN_CONTEXT_SOURCE]
         self.user: User = self.executor.plan.context[PLAN_CONTEXT_PENDING_USER]
-        self.group_connection_type: GroupSourceConnection = (
-            self.executor.current_stage.group_connection_type
-        )
+        self.group_connection_type: GroupSourceConnection = self.current_stage.group_connection_type
 
         raw_groups: dict[str, dict[str, Any | dict[str, Any]]] = self.executor.plan.context[
             PLAN_CONTEXT_SOURCE_GROUPS

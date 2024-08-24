@@ -70,7 +70,7 @@ class CaptchaChallengeResponse(ChallengeResponse):
         return data
 
 
-class CaptchaStageView(ChallengeStageView):
+class CaptchaStageView(ChallengeStageView[CaptchaChallenge]):
     """Simple captcha checker, logic is handled in django-captcha module"""
 
     response_class = CaptchaChallengeResponse
@@ -78,8 +78,8 @@ class CaptchaStageView(ChallengeStageView):
     def get_challenge(self, *args, **kwargs) -> Challenge:
         return CaptchaChallenge(
             data={
-                "js_url": self.executor.current_stage.js_url,
-                "site_key": self.executor.current_stage.public_key,
+                "js_url": self.current_stage.js_url,
+                "site_key": self.current_stage.public_key,
             }
         )
 
@@ -87,6 +87,6 @@ class CaptchaStageView(ChallengeStageView):
         response = response.validated_data["token"]
         self.executor.plan.context[PLAN_CONTEXT_CAPTCHA] = {
             "response": response,
-            "stage": self.executor.current_stage,
+            "stage": self.current_stage,
         }
         return self.executor.stage_ok()
