@@ -8,6 +8,7 @@ from rest_framework.serializers import BaseSerializer
 
 from authentik.core.models import Source
 from authentik.flows.models import Flow, Stage
+from authentik.stages.captcha.models import CaptchaStage
 from authentik.stages.password.models import PasswordStage
 
 
@@ -40,6 +41,15 @@ class IdentificationStage(Stage):
                 "When set, shows a password field, instead of showing the "
                 "password field as separate step."
             ),
+        ),
+    )
+    captcha_stage = models.ForeignKey(
+        CaptchaStage,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        help_text=_(
+            ("When set, the captcha element is shown on the identification stage."),
         ),
     )
 

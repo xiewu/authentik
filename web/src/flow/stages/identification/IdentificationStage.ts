@@ -3,6 +3,7 @@ import "@goauthentik/elements/Divider";
 import "@goauthentik/elements/EmptyState";
 import "@goauthentik/elements/forms/FormElement";
 import "@goauthentik/flow/components/ak-flow-password-input.js";
+import "@goauthentik/flow/stages/captcha/CaptchaStage";
 import { BaseStage } from "@goauthentik/flow/stages/base";
 
 import { msg, str } from "@lit/localize";
@@ -274,6 +275,9 @@ export class IdentificationStage extends BaseStage<
                   `
                 : nothing}
             ${this.renderNonFieldErrors()}
+            ${this.challenge.captchaStage ? html`
+                <ak-stage-captcha .challenge=${this.challenge.captchaStage} embedded></ak-stage-captcha>
+                ` : nothing}
             <div class="pf-c-form__group pf-m-action">
                 <button type="submit" class="pf-c-button pf-m-primary pf-m-block">
                     ${this.challenge.primaryAction}
@@ -282,6 +286,11 @@ export class IdentificationStage extends BaseStage<
             ${this.challenge.passwordlessUrl
                 ? html`<ak-divider>${msg("Or")}</ak-divider>`
                 : nothing}`;
+    }
+
+    submitForm(e: Event, defaults?: IdentificationChallengeResponseRequest | undefined): Promise<boolean> {
+
+        return super.submitForm(e, defaults);
     }
 
     render(): TemplateResult {

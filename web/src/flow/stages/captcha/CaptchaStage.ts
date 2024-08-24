@@ -7,7 +7,7 @@ import type { TurnstileObject } from "turnstile-types";
 
 import { msg } from "@lit/localize";
 import { CSSResult, PropertyValues, TemplateResult, html } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 
 import PFButton from "@patternfly/patternfly/components/Button/button.css";
@@ -44,6 +44,9 @@ export class CaptchaStage extends BaseStage<CaptchaChallenge, CaptchaChallengeRe
 
     @state()
     scriptElement?: HTMLScriptElement;
+
+    @property({type: Boolean})
+    embedded = false;
 
     constructor() {
         super();
@@ -161,6 +164,9 @@ export class CaptchaStage extends BaseStage<CaptchaChallenge, CaptchaChallengeRe
     }
 
     render(): TemplateResult {
+        if (this.embedded) {
+            return this.renderBody();
+        }
         if (!this.challenge) {
             return html`<ak-empty-state loading> </ak-empty-state>`;
         }

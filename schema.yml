@@ -40459,6 +40459,8 @@ components:
           nullable: true
         password_fields:
           type: boolean
+        captcha_stage:
+          $ref: '#/components/schemas/CaptchaChallenge'
         allow_show_password:
           type: boolean
           default: false
@@ -40500,6 +40502,8 @@ components:
         password:
           type: string
           nullable: true
+        captcha:
+          $ref: '#/components/schemas/CaptchaChallengeResponseRequest'
       required:
       - uid_field
     IdentificationStage:
@@ -40545,6 +40549,12 @@ components:
           nullable: true
           description: When set, shows a password field, instead of showing the password
             field as separate step.
+        captcha_stage:
+          type: string
+          format: uuid
+          nullable: true
+          description: When set, the captcha element is shown on the identification
+            stage.
         case_insensitive_matching:
           type: boolean
           description: When enabled, user fields are matched regardless of their casing.
@@ -40613,6 +40623,12 @@ components:
           nullable: true
           description: When set, shows a password field, instead of showing the password
             field as separate step.
+        captcha_stage:
+          type: string
+          format: uuid
+          nullable: true
+          description: When set, the captcha element is shown on the identification
+            stage.
         case_insensitive_matching:
           type: boolean
           description: When enabled, user fields are matched regardless of their casing.
@@ -45745,6 +45761,12 @@ components:
           nullable: true
           description: When set, shows a password field, instead of showing the password
             field as separate step.
+        captcha_stage:
+          type: string
+          format: uuid
+          nullable: true
+          description: When set, the captcha element is shown on the identification
+            stage.
         case_insensitive_matching:
           type: boolean
           description: When enabled, user fields are matched regardless of their casing.

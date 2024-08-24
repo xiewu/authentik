@@ -10091,6 +10091,11 @@
                     "title": "Password stage",
                     "description": "When set, shows a password field, instead of showing the password field as separate step."
                 },
+                "captcha_stage": {
+                    "type": "integer",
+                    "title": "Captcha stage",
+                    "description": "When set, the captcha element is shown on the identification stage."
+                },
                 "case_insensitive_matching": {
                     "type": "boolean",
                     "title": "Case insensitive matching",

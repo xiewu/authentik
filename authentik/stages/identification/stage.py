@@ -30,6 +30,11 @@ from authentik.lib.utils.urls import reverse_with_qs
 from authentik.root.middleware import ClientIPMiddleware
 from authentik.sources.oauth.types.apple import AppleLoginChallenge
 from authentik.sources.plex.models import PlexAuthenticationChallenge
+from authentik.stages.captcha.stage import (
+    CaptchaChallenge,
+    CaptchaChallengeResponse,
+    CaptchaStageView,
+)
 from authentik.stages.identification.models import IdentificationStage
 from authentik.stages.identification.signals import identification_failed
 from authentik.stages.password.stage import authenticate
@@ -64,6 +69,7 @@ class IdentificationChallenge(Challenge):
 
     user_fields = ListField(child=CharField(), allow_empty=True, allow_null=True)
     password_fields = BooleanField()
+    captcha_stage = CaptchaChallenge(required=False)
     allow_show_password = BooleanField(default=False)
     application_pre = CharField(required=False)
     flow_designation = ChoiceField(FlowDesignation.choices)
@@ -84,6 +90,7 @@ class IdentificationChallengeResponse(ChallengeResponse):
     uid_field = CharField()
     password = CharField(required=False, allow_blank=True, allow_null=True)
     component = CharField(default="ak-stage-identification")
+    captcha = CaptchaChallengeResponse(required=False)
 
     pre_user: User | None = None
 
@@ -128,30 +135,32 @@ class IdentificationChallengeResponse(ChallengeResponse):
                 return attrs
             raise ValidationError("Failed to authenticate.")
         self.pre_user = pre_user
-        if not current_stage.password_stage:
-            # No password stage select, don't validate the password
-            return attrs
-
-        password = attrs.get("password", None)
-        if not password:
-            self.stage.logger.warning("Password not set for ident+auth attempt")
-        try:
-            with start_span(
-                op="authentik.stages.identification.authenticate",
-                description="User authenticate call (combo stage)",
-            ):
-                user = authenticate(
-                    self.stage.request,
-                    current_stage.password_stage.backends,
-                    current_stage,
-                    username=self.pre_user.username,
-                    password=password,
-                )
-            if not user:
-                raise ValidationError("Failed to authenticate.")
-            self.pre_user = user
-        except PermissionDenied as exc:
-            raise ValidationError(str(exc)) from exc
+        if current_stage.password_stage:
+            password = attrs.get("password", None)
+            if not password:
+                self.stage.logger.warning("Password not set for ident+auth attempt")
+            try:
+                with start_span(
+                    op="authentik.stages.identification.authenticate",
+                    description="User authenticate call (combo stage)",
+                ):
+                    user = authenticate(
+                        self.stage.request,
+                        current_stage.password_stage.backends,
+                        current_stage,
+                        username=self.pre_user.username,
+                        password=password,
+                    )
+                if not user:
+                    raise ValidationError("Failed to authenticate.")
+                self.pre_user = user
+            except PermissionDenied as exc:
+                raise ValidationError(str(exc)) from exc
+        print(attrs)
+        # if current_stage.captcha_stage:
+        #     captcha = CaptchaStageView(self.stage.executor)
+        #     captcha.stage = current_stage.captcha_stage
+        #     captcha.challenge_valid(attrs.get("captcha"))
         return attrs
 
 
@@ -230,6 +239,12 @@ class IdentificationStageView(ChallengeStageView):
                 query=get_qs,
                 kwargs={"flow_slug": current_stage.passwordless_flow.slug},
             )
+        if current_stage.captcha_stage:
+            captcha = CaptchaStageView(self.executor)
+            captcha.stage = current_stage.captcha_stage
+            captcha_challenge = captcha.get_challenge()
+            captcha_challenge.is_valid()
+            challenge.initial_data["captcha_stage"] = captcha_challenge.data
 
         # Check all enabled source, add them if they have a UI Login button.
         ui_sources = []
