@@ -35,8 +35,8 @@ from authentik.core.models import User
 from authentik.core.tests.utils import create_test_admin_user
 from authentik.lib.generators import generate_id
 
-RETRIES = int(environ.get("RETRIES", "3"))
 IS_CI = "CI" in environ
+RETRIES = int(environ.get("RETRIES", "3")) if IS_CI else 1
 
 
 def get_docker_tag() -> str:
@@ -150,6 +150,7 @@ class DockerTestCase(TestCase):
 class SeleniumTestCase(DockerTestCase, StaticLiveServerTestCase):
     """StaticLiveServerTestCase which automatically creates a Webdriver instance"""
 
+    host = "0.0.0.0"
     wait_timeout: int
     user: User
 
