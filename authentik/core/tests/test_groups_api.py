@@ -124,6 +124,19 @@ class TestGroupsAPI(APITestCase):
             {"detail": "User does not have permission to set the given superuser status."},
         )
 
+    def test_superuser_update_object_perm(self):
+        """Test updating a superuser group with object permission"""
+        group = Group.objects.create(name=generate_id(), is_superuser=False)
+        assign_perm("view_group", self.login_user, group)
+        assign_perm("change_group", self.login_user, group)
+        assign_perm("enable_group_superuser", self.login_user, group)
+        self.client.force_login(self.login_user)
+        res = self.client.patch(
+            reverse("authentik_api:group-detail", kwargs={"pk": group.pk}),
+            data={"is_superuser": True},
+        )
+        self.assertEqual(res.status_code, 200)
+
     def test_superuser_update_no_perm(self):
         """Test updating a superuser group without permission"""
         group = Group.objects.create(name=generate_id(), is_superuser=True)

@@ -181,7 +181,7 @@ class SuperuserSetter(BasePermission):
             return True
 
         perm = self.enable_perm if new_value else self.disable_perm
-        return request.user.has_perm(perm)
+        return request.user.has_perm(perm) or request.user.has_perm(perm, object)
 
 
 class GroupViewSet(UsedByMixin, ModelViewSet):
