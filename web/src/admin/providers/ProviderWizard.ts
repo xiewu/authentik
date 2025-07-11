@@ -30,20 +30,20 @@ export class ProviderWizard extends AKElement {
     static styles: CSSResult[] = [PFBase, PFButton];
 
     @property()
-    createText = msg("Create");
+    public createText = msg("Create");
 
     @property({ attribute: false })
-    providerTypes: TypeCreate[] = [];
+    public providerTypes: TypeCreate[] = [];
 
     @property({ attribute: false })
-    finalHandler: () => Promise<void> = () => {
+    public finalHandler: () => Promise<void> = () => {
         return Promise.resolve();
     };
 
     @query("ak-wizard")
-    wizard?: Wizard;
+    protected wizard?: Wizard;
 
-    connectedCallback() {
+    public connectedCallback() {
         super.connectedCallback();
         new ProvidersApi(DEFAULT_CONFIG).providersAllTypesList().then((providerTypes) => {
             this.providerTypes = providerTypes;
@@ -56,9 +56,7 @@ export class ProviderWizard extends AKElement {
                 .steps=${["initial"]}
                 header=${msg("New provider")}
                 description=${msg("Create a new provider.")}
-                .finalHandler=${() => {
-                    return this.finalHandler();
-                }}
+                .finalHandler=${() => this.finalHandler()}
             >
                 <ak-wizard-page-type-create
                     name="selectProviderType"

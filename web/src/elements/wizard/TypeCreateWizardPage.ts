@@ -36,6 +36,8 @@ export class TypeCreateWizardPage extends WithLicenseSummary(WizardPage) {
 
     //#endregion
 
+    public override nextCallback = null;
+
     static styles: CSSResult[] = [
         PFBase,
         PFForm,

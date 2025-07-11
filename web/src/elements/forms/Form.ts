@@ -267,6 +267,8 @@ export abstract class Form<T = Record<string, unknown>> extends AKElement {
     public submit(event: SubmitEvent): Promise<unknown | false> {
         event.preventDefault();
 
+        debugger;
+
         const data = this.serialize();
 
         if (!data) return Promise.resolve(false);

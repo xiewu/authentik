@@ -1,7 +1,7 @@
 import { AKElement } from "#elements/Base";
 import { Wizard } from "#elements/wizard/Wizard";
 
-import { CSSResult, html, PropertyDeclaration, TemplateResult } from "lit";
+import { CSSResult, html, LitElement, PropertyDeclaration, TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import PFBase from "@patternfly/patternfly/patternfly-base.css";
@@ -19,7 +19,7 @@ export type WizardPageActiveCallback = () => void | Promise<void>;
 export type WizardPageNextCallback = () => boolean | Promise<boolean>;
 
 @customElement("ak-wizard-page")
-export class WizardPage extends AKElement {
+export abstract class WizardPage extends AKElement {
     static styles: CSSResult[] = [PFBase];
 
     /**
@@ -29,11 +29,11 @@ export class WizardPage extends AKElement {
      * @todo: Should this be a getter or static property?
      */
     @property()
-    sidebarLabel = (): string => {
+    public sidebarLabel = (): string => {
         return "UNNAMED";
     };
 
-    get host(): Wizard {
+    public get host(): Wizard {
         return this.parentElement as Wizard;
     }
 
@@ -49,7 +49,7 @@ export class WizardPage extends AKElement {
     /**
      * Called when this is the page brought into view.
      */
-    activeCallback: WizardPageActiveCallback = () => {
+    public activeCallback: WizardPageActiveCallback = () => {
         this.host.isValid = false;
     };
 
@@ -60,24 +60,23 @@ export class WizardPage extends AKElement {
      *
      * @returns `true` if the wizard can proceed to the next page, `false` otherwise.
      */
-    nextCallback: WizardPageNextCallback = () => {
-        return Promise.resolve(true);
-    };
+    public abstract nextCallback: WizardPageNextCallback | null;
 
-    requestUpdate(
+    public requestUpdate(
         name?: PropertyKey,
         oldValue?: unknown,
         options?: PropertyDeclaration<unknown, unknown>,
     ): void {
-        this.querySelectorAll("*").forEach((el) => {
-            if ("requestUpdate" in el) {
-                (el as AKElement).requestUpdate();
+        for (const el of this.querySelectorAll("*")) {
+            if (el instanceof LitElement) {
+                el.requestUpdate();
             }
-        });
+        }
+
         return super.requestUpdate(name, oldValue, options);
     }
 
-    render(): TemplateResult {
+    public render(): TemplateResult {
         return html`<slot></slot>`;
     }
 }
